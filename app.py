@@ -1,6 +1,6 @@
 import plotly.express as px
 import pandas as pd
-from dash import Dash, dcc, html, Input, Output
+from dash import Dash, dcc, html, Input, Output, State, ctx
 import dash_bootstrap_components as dbc
 import plotly.graph_objects as go
 
@@ -30,7 +30,11 @@ server = app.server
 app.layout = dbc.Container([
     dbc.Row(
         dbc.Col(
-            html.H1("European CO2 Intensity 2015 - 2025", className="text-primary my-4", style={'textAlign': 'left'}),
+            html.H1(
+                "European CO2 Intensity 2015 - 2025",
+                className="text-primary my-4",
+                style={'textAlign': 'left'}
+            ),
             width=12
         )
     ),
@@ -71,10 +75,50 @@ app.layout = dbc.Container([
         ),
     ]),
 
+    dbc.Row([
+        dbc.Col([
+            html.Button("Start animation", id="start-stop-btn", n_clicks=0, className="btn btn-primary"),
+            dcc.Store(id="animation-running", data=False)
+        ], width="auto"),
+    ], className="mb-4"),
+
+    dcc.Interval(
+        id='interval-component',
+        interval=2000,  # 2000 ms = 2 seconds
+        n_intervals=0,
+        disabled=True  # start as disabled
+    )
+
 ], fluid=True, className="bg-light p-4")
 
 
-# --- 4. Callback to Update Charts ---
+# --- 4. Button Callback: Start/Stop animation ---
+@app.callback(
+    Output("animation-running", "data"),
+    Output("start-stop-btn", "children"),
+    Output("interval-component", "disabled"),
+    Input("start-stop-btn", "n_clicks"),
+    State("animation-running", "data"),
+    prevent_initial_call=True
+)
+def toggle_animation(n_clicks, running):
+    # Toggle the running state
+    if running:
+        return False, "Start animation", True
+    else:
+        return True, "Stop animation", False
+
+# --- 5. Interval Callback to Animate Countries (stacked) ---
+@app.callback(
+    Output('country-multiselect-dropdown', 'value'),
+    [Input('interval-component', 'n_intervals')],
+    [State('country-multiselect-dropdown', 'value')]
+)
+def animate_countries(n_intervals, current_selection):
+    n = (n_intervals % len(ALL_COUNTRIES)) + 1
+    return ALL_COUNTRIES[:n]
+
+# --- 6. Callback to Update Charts ---
 @app.callback(
     Output('multi-country-line-chart', 'figure'),
     Output('heatmap-chart', 'figure'),
@@ -152,7 +196,7 @@ def update_charts(selected_countries):
         heatmap_fig = px.imshow(
             pivot,
             aspect="auto",
-            color_continuous_scale='YlGnBu',  # világos színskála
+            color_continuous_scale='YlGnBu',
             labels=dict(x="Year", y="Country", color="Average Value"),
             template='plotly_white'
         )
@@ -163,6 +207,6 @@ def update_charts(selected_countries):
 
     return line_fig, heatmap_fig
 
-# --- 5. Run the App ---
+# --- 7. Run the App ---
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=8080)

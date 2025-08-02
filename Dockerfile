@@ -1,23 +1,18 @@
-# Use an official Python runtime as a parent image
+# Használj hivatalos Python image-et
 FROM python:3.11-slim
 
-# Set environment variables
-ENV PYTHONDONTWRITEBYTECODE=1
-ENV PYTHONUNBUFFERED=1
-
-# Set work directory
+# Munkakönyvtár beállítása
 WORKDIR /app
 
-# Install dependencies
-COPY requirements.txt /app/
-RUN pip install --upgrade pip
-RUN pip install -r requirements.txt
+# Követelmények bemásolása és telepítése
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy project
-COPY . /app/
+# App bemásolása
+COPY . .
 
-# Expose the port Dash will run on
-EXPOSE 8080
+# Port beállítása (Dash default: 8050)
+EXPOSE 8050
 
-# Start the app with gunicorn
-CMD ["gunicorn", "-b", "0.0.0.0:8080", "app:app.server"]
+# Indítás Gunicorn-nal (ajánlott Renderen)
+CMD ["gunicorn", "--bind", "0.0.0.0:8050", "app:server"]
