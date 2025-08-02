@@ -184,7 +184,7 @@ def update_charts(selected_countries):
         (df['Category'] == category) &
         (df['Variable'] == variable)
     ]
-    pivot = dff_heatmap.groupby(['Area', 'Year'])['Value'].mean().unstack(fill_value=0)
+    pivot = dff_heatmap.groupby(['Area', 'Month'])['Value'].mean().unstack(fill_value=0)
 
     if pivot.empty:
         heatmap_fig = go.Figure()
