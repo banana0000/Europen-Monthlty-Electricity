@@ -74,6 +74,7 @@ app.layout = dbc.Container([
             lg=5, md=12
         ),
     ]),
+    html.Br(),
 
     dbc.Row([
         dbc.Col([
