@@ -13,10 +13,13 @@ df['Month'] = df['Date'].dt.month
 if 'Day' not in df.columns:
     df['Day'] = 1  # fallback if no daily data
 
+# Filter data from 2015 onwards
+df = df[df['Year'] >= 2015]
+
 ALL_COUNTRIES = sorted(df['Area'].unique())
 
 # Only CO2 metric
-METRIC_LABEL = 'CO₂ Intensity (gCO2e/kWh)'
+METRIC_LABEL = 'CO₂ Intensity (gCO₂e/kWh)'
 METRIC_DETAILS = {
     'Category': 'Power sector emissions',
     'Variable': 'CO2 intensity'
@@ -31,7 +34,7 @@ app.layout = dbc.Container([
     dbc.Row(
         dbc.Col(
             html.H1(
-                "European CO2 Intensity 2015 - 2025",
+                "European CO₂ Intensity 2015 - 2025",
                 className="text-primary my-4",
                 style={'textAlign': 'left'}
             ),
@@ -66,7 +69,7 @@ app.layout = dbc.Container([
         dbc.Col(
             dbc.Card(
                 dbc.CardBody([
-                    html.H5("Country-Year", className="card-title text-center"),
+                    html.H5("Country-Month Heatmap", className="card-title text-center"),
                     dcc.Graph(id='heatmap-chart', figure={}, style={'height': '500px'}),
                 ]),
                 className="shadow-sm h-100"
@@ -129,22 +132,23 @@ def update_charts(selected_countries):
     category = METRIC_DETAILS['Category']
     variable = METRIC_DETAILS['Variable']
 
-    dff_line = df[
+    # Filter data for selected countries and metric
+    dff = df[
         (df['Area'].isin(selected_countries)) &
         (df['Category'] == category) &
         (df['Variable'] == variable)
     ]
 
-    # --- Spline Line Chart with min/max markers ---
-    if dff_line.empty:
+    # --- 1. Spline Line Chart by country over time ---
+    if dff.empty:
         line_fig = go.Figure().update_layout(
             title_text="Please select at least one country",
             template='plotly_white'
         )
     else:
         line_fig = go.Figure()
-        for area in dff_line['Area'].unique():
-            area_df = dff_line[dff_line['Area'] == area].sort_values('Date')
+        for area in dff['Area'].unique():
+            area_df = dff[dff['Area'] == area].sort_values('Date')
             line_fig.add_trace(go.Scatter(
                 x=area_df['Date'],
                 y=area_df['Value'],
@@ -152,58 +156,45 @@ def update_charts(selected_countries):
                 name=area,
                 line_shape='spline'
             ))
-            # Min and max markers
-            min_idx = area_df['Value'].idxmin()
-            max_idx = area_df['Value'].idxmax()
-            for idx, marker_color in [
-                (min_idx, 'red'),
-                (max_idx, 'green')
-            ]:
-                if pd.notna(idx):
-                    line_fig.add_trace(go.Scatter(
-                        x=[area_df.loc[idx, 'Date']],
-                        y=[area_df.loc[idx, 'Value']],
-                        mode='markers',
-                        marker=dict(color=marker_color, size=12, symbol='circle'),
-                        name=f"{area} {'min' if marker_color=='red' else 'max'}",
-                        showlegend=False
-                    ))
         line_fig.update_layout(
             transition_duration=500,
             legend_title_text='Country',
             title={
-                'text': f"{METRIC_LABEL} by Country Over Time",
+                'text': f"CO₂ Intensity (gCO₂e/kWh) by Country (2015-2025)",
                 'x': 0.5,
                 'xanchor': 'center'
             },
+            xaxis_title="Date",
+            yaxis_title="CO₂ Intensity (gCO₂e/kWh)",
             template='plotly_white'
         )
 
-    # --- Heatmap: év (x) vs ország (y), átlag ---
-    dff_heatmap = df[
-        (df['Area'].isin(selected_countries)) &
-        (df['Category'] == category) &
-        (df['Variable'] == variable)
-    ]
-    pivot = dff_heatmap.groupby(['Area', 'Year'])['Value'].mean().unstack(fill_value=0)
-
-    if pivot.empty:
+    # --- 2. Heatmap: Month (x) vs Country (y), average value ---
+    if dff.empty:
         heatmap_fig = go.Figure()
         heatmap_fig.update_layout(
             title="No data for selected countries.",
             template='plotly_white'
         )
     else:
+        # Average by country and month
+        pivot = dff.groupby(['Area', 'Month'])['Value'].mean().unstack(fill_value=0)
+        # Optional: show month names instead of numbers
+        month_names = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+                       'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+        pivot.columns = [month_names[m-1] for m in pivot.columns]
         heatmap_fig = px.imshow(
             pivot,
             aspect="auto",
             color_continuous_scale='YlGnBu',
-            labels=dict(x="Year", y="Country", color="Average Value"),
+            labels=dict(x="Month", y="Country", color="Avg CO₂ Intensity"),
             template='plotly_white'
         )
         heatmap_fig.update_layout(
             transition_duration=300,
-            title="Country-Year Heatmap"
+            title="Average Monthly CO₂ Intensity by Country (2015-2025)",
+            xaxis_title="Month",
+            yaxis_title="Country"
         )
 
     return line_fig, heatmap_fig
